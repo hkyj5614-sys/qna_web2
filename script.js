@@ -126,6 +126,25 @@ function setupEventListeners() {
             closeQuestionModal();
         }
     });
+    
+    // 질문 목록 이벤트 위임
+    questionsList.addEventListener('click', function(event) {
+        const questionItem = event.target.closest('.question-item');
+        if (!questionItem) return;
+        
+        const questionId = questionItem.dataset.questionId;
+        
+        // 질문 내용 클릭 시 모달 열기
+        if (event.target.closest('.question-content')) {
+            openQuestionModal(questionId);
+        }
+        
+        // 삭제 버튼 클릭 시 질문 삭제
+        if (event.target.classList.contains('delete-btn')) {
+            event.stopPropagation();
+            deleteQuestion(questionId);
+        }
+    });
 }
 
 // 질문 등록 처리
@@ -207,8 +226,8 @@ function renderQuestions() {
     }
     
     questionsList.innerHTML = questions.map(question => `
-        <div class="question-item">
-            <div class="question-content" onclick="openQuestionModal('${question.id}')">
+        <div class="question-item" data-question-id="${question.id}">
+            <div class="question-content">
                 <h3>${escapeHtml(question.title)}</h3>
                 <p>${escapeHtml(question.content.substring(0, 100))}${question.content.length > 100 ? '...' : ''}</p>
                 <div class="question-meta">
@@ -216,7 +235,7 @@ function renderQuestions() {
                     <span class="answer-count">답변 ${question.answers.length}개</span>
                 </div>
             </div>
-            <button class="delete-btn" onclick="event.stopPropagation(); deleteQuestion('${question.id}')" title="질문 삭제">×</button>
+            <button class="delete-btn" title="질문 삭제">×</button>
         </div>
     `).join('');
 }
@@ -224,10 +243,13 @@ function renderQuestions() {
 // 질문 모달 열기
 function openQuestionModal(questionId) {
     console.log('Opening modal for question ID:', questionId, 'Type:', typeof questionId);
+    console.log('Available questions:', questions.map(q => ({ id: q.id, type: typeof q.id })));
+    
     // 문자열로 변환하여 비교
     const question = questions.find(q => String(q.id) === String(questionId));
     if (!question) {
         console.error('Question not found for ID:', questionId);
+        console.error('Available IDs:', questions.map(q => q.id));
         return;
     }
     
