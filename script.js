@@ -185,7 +185,7 @@ async function handleAnswerSubmit(e) {
         await loadQuestionsFromFirebase();
         
         // 현재 모달의 답변 목록 새로고침
-        const question = questions.find(q => q.id === currentQuestionId);
+        const question = questions.find(q => String(q.id) === String(currentQuestionId));
         if (question) {
             renderAnswers();
         }
@@ -208,7 +208,7 @@ function renderQuestions() {
     
     questionsList.innerHTML = questions.map(question => `
         <div class="question-item">
-            <div class="question-content" onclick="openQuestionModal(${question.id})">
+            <div class="question-content" onclick="openQuestionModal('${question.id}')">
                 <h3>${escapeHtml(question.title)}</h3>
                 <p>${escapeHtml(question.content.substring(0, 100))}${question.content.length > 100 ? '...' : ''}</p>
                 <div class="question-meta">
@@ -216,15 +216,20 @@ function renderQuestions() {
                     <span class="answer-count">답변 ${question.answers.length}개</span>
                 </div>
             </div>
-            <button class="delete-btn" onclick="event.stopPropagation(); deleteQuestion(${question.id})" title="질문 삭제">×</button>
+            <button class="delete-btn" onclick="event.stopPropagation(); deleteQuestion('${question.id}')" title="질문 삭제">×</button>
         </div>
     `).join('');
 }
 
 // 질문 모달 열기
 function openQuestionModal(questionId) {
-    const question = questions.find(q => q.id === questionId);
-    if (!question) return;
+    console.log('Opening modal for question ID:', questionId, 'Type:', typeof questionId);
+    // 문자열로 변환하여 비교
+    const question = questions.find(q => String(q.id) === String(questionId));
+    if (!question) {
+        console.error('Question not found for ID:', questionId);
+        return;
+    }
     
     currentQuestionId = questionId;
     
@@ -247,7 +252,7 @@ function openQuestionModal(questionId) {
 
 // 답변 목록 렌더링
 function renderAnswers() {
-    const question = questions.find(q => q.id === currentQuestionId);
+    const question = questions.find(q => String(q.id) === String(currentQuestionId));
     if (!question) return;
     
     if (question.answers.length === 0) {
@@ -272,10 +277,11 @@ function renderAnswers() {
 
 // 질문 삭제
 async function deleteQuestion(questionId) {
+    console.log('Deleting question ID:', questionId, 'Type:', typeof questionId);
     if (confirm('정말로 이 질문을 삭제하시겠습니까?\n모든 답변도 함께 삭제됩니다.')) {
         try {
             // 현재 열린 모달이 삭제하려는 질문이면 모달 닫기
-            if (currentQuestionId === questionId) {
+            if (String(currentQuestionId) === String(questionId)) {
                 closeQuestionModal();
             }
             
