@@ -14,5 +14,19 @@ firebase.initializeApp(firebaseConfig);
 // Firestore 데이터베이스 참조
 const db = firebase.firestore();
 
+// Firestore 설정 (개발 환경용)
+db.settings({
+  cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
+  experimentalForceLongPolling: true,
+  useFetchStreams: false
+});
+
 // 전역 변수로 db를 사용할 수 있도록 설정
-window.db = db; 
+window.db = db;
+
+// 연결 상태 확인
+db.enableNetwork().then(() => {
+  console.log('Firebase Firestore 연결 성공');
+}).catch((error) => {
+  console.error('Firebase Firestore 연결 실패:', error);
+}); 

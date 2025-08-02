@@ -17,6 +17,10 @@ async function loadQuestionsFromFirebase() {
     try {
         isLoading = true;
         showLoadingSpinner();
+        
+        // 네트워크 연결 상태 확인
+        await db.enableNetwork();
+        
         const snapshot = await db.collection('questions').orderBy('date', 'desc').get();
         questions = [];
         snapshot.forEach(doc => {
@@ -28,10 +32,31 @@ async function loadQuestionsFromFirebase() {
         renderQuestions();
     } catch (error) {
         console.error('Error loading questions:', error);
-        showNotification('질문을 불러오는 중 오류가 발생했습니다.', 'error');
+        
+        // 오프라인 모드일 때 로컬 캐시 사용
+        if (error.code === 'unavailable' || error.code === 'permission-denied') {
+            showNotification('오프라인 모드입니다. 로컬 캐시를 사용합니다.', 'warning');
+            // 로컬 스토리지에서 데이터 불러오기 (백업)
+            loadFromLocalStorage();
+        } else {
+            showNotification('질문을 불러오는 중 오류가 발생했습니다.', 'error');
+        }
     } finally {
         isLoading = false;
         hideLoadingSpinner();
+    }
+}
+
+// 로컬 스토리지에서 데이터 불러오기 (백업)
+function loadFromLocalStorage() {
+    try {
+        const savedData = localStorage.getItem('qnaQuestions');
+        if (savedData) {
+            questions = JSON.parse(savedData);
+            renderQuestions();
+        }
+    } catch (error) {
+        console.error('Error loading from localStorage:', error);
     }
 }
 
@@ -336,7 +361,12 @@ function showNotification(message, type = 'success') {
     notification.textContent = message;
     
     // 타입에 따른 색상 설정
-    const bgColor = type === 'error' ? '#ff4757' : '#4CAF50';
+    let bgColor = '#4CAF50'; // 기본 성공 색상
+    if (type === 'error') {
+        bgColor = '#ff4757';
+    } else if (type === 'warning') {
+        bgColor = '#ffa502';
+    }
     
     notification.style.cssText = `
         position: fixed;
