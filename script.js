@@ -1,6 +1,7 @@
-// 데이터 저장소 (실제 프로젝트에서는 서버나 데이터베이스를 사용)
+// Firebase 데이터베이스 참조
 let questions = [];
 let currentQuestionId = null;
+let isLoading = false;
 
 // DOM 요소들
 const questionForm = document.getElementById('questionForm');
@@ -11,13 +12,73 @@ const answerForm = document.getElementById('answerForm');
 const answersList = document.getElementById('answersList');
 const closeModal = document.querySelector('.close');
 
+// Firebase 데이터베이스 함수들
+async function loadQuestionsFromFirebase() {
+    try {
+        isLoading = true;
+        showLoadingSpinner();
+        const snapshot = await db.collection('questions').orderBy('date', 'desc').get();
+        questions = [];
+        snapshot.forEach(doc => {
+            questions.push({
+                id: doc.id,
+                ...doc.data()
+            });
+        });
+        renderQuestions();
+    } catch (error) {
+        console.error('Error loading questions:', error);
+        showNotification('질문을 불러오는 중 오류가 발생했습니다.', 'error');
+    } finally {
+        isLoading = false;
+        hideLoadingSpinner();
+    }
+}
+
+async function addQuestionToFirebase(questionData) {
+    try {
+        const docRef = await db.collection('questions').add({
+            title: questionData.title,
+            content: questionData.content,
+            date: firebase.firestore.FieldValue.serverTimestamp(),
+            answers: []
+        });
+        return docRef.id;
+    } catch (error) {
+        console.error('Error adding question:', error);
+        throw error;
+    }
+}
+
+async function addAnswerToFirebase(questionId, answerData) {
+    try {
+        const questionRef = db.collection('questions').doc(questionId);
+        await questionRef.update({
+            answers: firebase.firestore.FieldValue.arrayUnion({
+                id: Date.now(),
+                content: answerData.content,
+                date: firebase.firestore.FieldValue.serverTimestamp()
+            })
+        });
+    } catch (error) {
+        console.error('Error adding answer:', error);
+        throw error;
+    }
+}
+
+async function deleteQuestionFromFirebase(questionId) {
+    try {
+        await db.collection('questions').doc(questionId).delete();
+    } catch (error) {
+        console.error('Error deleting question:', error);
+        throw error;
+    }
+}
+
 // 페이지 로드 시 초기화
 document.addEventListener('DOMContentLoaded', function() {
-    // 로컬 스토리지에서 데이터 불러오기
-    loadData();
-    
-    // 질문 목록 렌더링
-    renderQuestions();
+    // Firebase에서 데이터 불러오기
+    loadQuestionsFromFirebase();
     
     // 이벤트 리스너 등록
     setupEventListeners();
@@ -43,7 +104,7 @@ function setupEventListeners() {
 }
 
 // 질문 등록 처리
-function handleQuestionSubmit(e) {
+async function handleQuestionSubmit(e) {
     e.preventDefault();
     
     const title = document.getElementById('questionTitle').value.trim();
@@ -54,27 +115,24 @@ function handleQuestionSubmit(e) {
         return;
     }
     
-    const question = {
-        id: Date.now(),
-        title: title,
-        content: content,
-        date: new Date().toLocaleString('ko-KR'),
-        answers: []
-    };
-    
-    questions.unshift(question); // 새 질문을 맨 위에 추가
-    saveData();
-    renderQuestions();
-    
-    // 폼 초기화
-    questionForm.reset();
-    
-    // 성공 메시지
-    showNotification('질문이 성공적으로 등록되었습니다!');
+    try {
+        await addQuestionToFirebase({ title, content });
+        
+        // 폼 초기화
+        questionForm.reset();
+        
+        // 성공 메시지
+        showNotification('질문이 성공적으로 등록되었습니다!');
+        
+        // 질문 목록 새로고침
+        await loadQuestionsFromFirebase();
+    } catch (error) {
+        showNotification('질문 등록 중 오류가 발생했습니다.', 'error');
+    }
 }
 
 // 답변 등록 처리
-function handleAnswerSubmit(e) {
+async function handleAnswerSubmit(e) {
     e.preventDefault();
     
     const content = document.getElementById('answerContent').value.trim();
@@ -89,24 +147,25 @@ function handleAnswerSubmit(e) {
         return;
     }
     
-    const answer = {
-        id: Date.now(),
-        content: content,
-        date: new Date().toLocaleString('ko-KR')
-    };
-    
-    // 현재 질문에 답변 추가
-    const question = questions.find(q => q.id === currentQuestionId);
-    if (question) {
-        question.answers.push(answer);
-        saveData();
-        renderAnswers();
+    try {
+        await addAnswerToFirebase(currentQuestionId, { content });
         
         // 폼 초기화
         answerForm.reset();
         
         // 성공 메시지
         showNotification('답변이 성공적으로 등록되었습니다!');
+        
+        // 질문 목록 새로고침하여 답변 수 업데이트
+        await loadQuestionsFromFirebase();
+        
+        // 현재 모달의 답변 목록 새로고침
+        const question = questions.find(q => q.id === currentQuestionId);
+        if (question) {
+            renderAnswers();
+        }
+    } catch (error) {
+        showNotification('답변 등록 중 오류가 발생했습니다.', 'error');
     }
 }
 
@@ -187,22 +246,25 @@ function renderAnswers() {
 }
 
 // 질문 삭제
-function deleteQuestion(questionId) {
+async function deleteQuestion(questionId) {
     if (confirm('정말로 이 질문을 삭제하시겠습니까?\n모든 답변도 함께 삭제됩니다.')) {
-        // 현재 열린 모달이 삭제하려는 질문이면 모달 닫기
-        if (currentQuestionId === questionId) {
-            closeQuestionModal();
+        try {
+            // 현재 열린 모달이 삭제하려는 질문이면 모달 닫기
+            if (currentQuestionId === questionId) {
+                closeQuestionModal();
+            }
+            
+            // Firebase에서 질문 삭제
+            await deleteQuestionFromFirebase(questionId);
+            
+            // 성공 메시지
+            showNotification('질문이 삭제되었습니다.');
+            
+            // 질문 목록 새로고침
+            await loadQuestionsFromFirebase();
+        } catch (error) {
+            showNotification('질문 삭제 중 오류가 발생했습니다.', 'error');
         }
-        
-        // 질문 배열에서 해당 질문 제거
-        questions = questions.filter(q => q.id !== questionId);
-        
-        // 데이터 저장 및 목록 다시 렌더링
-        saveData();
-        renderQuestions();
-        
-        // 성공 메시지
-        showNotification('질문이 삭제되었습니다.');
     }
 }
 
@@ -213,16 +275,43 @@ function closeQuestionModal() {
     currentQuestionId = null;
 }
 
-// 데이터 저장 (로컬 스토리지)
-function saveData() {
-    localStorage.setItem('qnaQuestions', JSON.stringify(questions));
+// 로딩 상태 표시 함수
+function showLoadingSpinner() {
+    const spinner = document.createElement('div');
+    spinner.id = 'loadingSpinner';
+    spinner.innerHTML = `
+        <div style="
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0,0,0,0.8);
+            color: white;
+            padding: 20px;
+            border-radius: 10px;
+            z-index: 10000;
+        ">
+            <div style="text-align: center;">
+                <div style="
+                    width: 40px;
+                    height: 40px;
+                    border: 4px solid #f3f3f3;
+                    border-top: 4px solid #667eea;
+                    border-radius: 50%;
+                    animation: spin 1s linear infinite;
+                    margin: 0 auto 10px;
+                "></div>
+                <p>데이터를 불러오는 중...</p>
+            </div>
+        </div>
+    `;
+    document.body.appendChild(spinner);
 }
 
-// 데이터 불러오기 (로컬 스토리지)
-function loadData() {
-    const savedData = localStorage.getItem('qnaQuestions');
-    if (savedData) {
-        questions = JSON.parse(savedData);
+function hideLoadingSpinner() {
+    const spinner = document.getElementById('loadingSpinner');
+    if (spinner) {
+        spinner.remove();
     }
 }
 
@@ -234,7 +323,7 @@ function escapeHtml(text) {
 }
 
 // 알림 메시지 표시
-function showNotification(message) {
+function showNotification(message, type = 'success') {
     // 기존 알림 제거
     const existingNotification = document.querySelector('.notification');
     if (existingNotification) {
@@ -245,11 +334,15 @@ function showNotification(message) {
     const notification = document.createElement('div');
     notification.className = 'notification';
     notification.textContent = message;
+    
+    // 타입에 따른 색상 설정
+    const bgColor = type === 'error' ? '#ff4757' : '#4CAF50';
+    
     notification.style.cssText = `
         position: fixed;
         top: 20px;
         right: 20px;
-        background: #4CAF50;
+        background: ${bgColor};
         color: white;
         padding: 15px 20px;
         border-radius: 8px;
@@ -272,6 +365,20 @@ function showNotification(message) {
                 opacity: 1;
             }
         }
+        @keyframes slideOut {
+            from {
+                transform: translateX(0);
+                opacity: 1;
+            }
+            to {
+                transform: translateX(100%);
+                opacity: 0;
+            }
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
     `;
     document.head.appendChild(style);
     
@@ -286,22 +393,6 @@ function showNotification(message) {
             }
         }, 300);
     }, 3000);
-    
-    // slideOut 애니메이션 추가
-    const slideOutStyle = document.createElement('style');
-    slideOutStyle.textContent = `
-        @keyframes slideOut {
-            from {
-                transform: translateX(0);
-                opacity: 1;
-            }
-            to {
-                transform: translateX(100%);
-                opacity: 0;
-            }
-        }
-    `;
-    document.head.appendChild(slideOutStyle);
 }
 
 // 키보드 단축키 지원
