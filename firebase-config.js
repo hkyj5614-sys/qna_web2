@@ -19,7 +19,7 @@ db.settings({
   cacheSizeBytes: firebase.firestore.CACHE_SIZE_UNLIMITED,
   experimentalForceLongPolling: true,
   useFetchStreams: false
-});
+}, { merge: true });
 
 // 전역 변수로 db를 사용할 수 있도록 설정
 window.db = db;
