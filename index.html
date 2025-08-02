@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>질문게시판</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>질문게시판</h1>
+        </header>
+
+        <!-- 질문 작성 섹션 -->
+        <section class="question-form">
+            <h2>새 질문 작성</h2>
+            <form id="questionForm">
+                <div class="form-group">
+                    <label for="questionTitle">제목:</label>
+                    <input type="text" id="questionTitle" required placeholder="질문 제목을 입력하세요">
+                </div>
+                <div class="form-group">
+                    <label for="questionContent">내용:</label>
+                    <textarea id="questionContent" required placeholder="질문 내용을 입력하세요"></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">질문 등록</button>
+            </form>
+        </section>
+
+        <!-- 질문 목록 섹션 -->
+        <section class="question-list">
+            <h2>질문 목록</h2>
+            <div id="questionsList">
+                <!-- 질문들이 여기에 동적으로 추가됩니다 -->
+            </div>
+        </section>
+
+        <!-- 질문 상세 보기 모달 -->
+        <div id="questionModal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <div id="questionDetail">
+                    <!-- 선택된 질문의 상세 내용이 여기에 표시됩니다 -->
+                </div>
+                
+                <!-- 답변 작성 폼 -->
+                <div class="answer-form">
+                    <h3>답변 작성</h3>
+                    <form id="answerForm">
+                        <div class="form-group">
+                            <label for="answerContent">답변:</label>
+                            <textarea id="answerContent" required placeholder="답변을 입력하세요"></textarea>
+                        </div>
+                        <button type="submit" class="btn btn-secondary">답변 등록</button>
+                    </form>
+                </div>
+
+                <!-- 답변 목록 -->
+                <div class="answers-list">
+                    <h3>답변 목록</h3>
+                    <div id="answersList">
+                        <!-- 답변들이 여기에 동적으로 추가됩니다 -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html> 
