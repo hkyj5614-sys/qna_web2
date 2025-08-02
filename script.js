@@ -65,7 +65,7 @@ async function addQuestionToFirebase(questionData) {
         const docRef = await db.collection('questions').add({
             title: questionData.title,
             content: questionData.content,
-            date: firebase.firestore.FieldValue.serverTimestamp(),
+            date: new Date().toLocaleString('ko-KR'),
             answers: []
         });
         return docRef.id;
@@ -82,7 +82,7 @@ async function addAnswerToFirebase(questionId, answerData) {
             answers: firebase.firestore.FieldValue.arrayUnion({
                 id: Date.now(),
                 content: answerData.content,
-                date: firebase.firestore.FieldValue.serverTimestamp()
+                date: new Date().toLocaleString('ko-KR')
             })
         });
     } catch (error) {
